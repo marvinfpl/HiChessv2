@@ -13,5 +13,7 @@ PLAYER_COLOR = "white"
 
 ## Chess AI Configuration
 
-AI_TYPE = "random"  # Options: random, minimax (future)
+AI_TYPE = "stockfish"  # Options: stockfish, random
+STOCKFISH_PATH = "/opt/homebrew/bin/stockfish"  # Path to Stockfish binary
+STOCKFISH_TIME_LIMIT = 1.0  # Seconds per move
 AI_DIFFICULTY = 1   # 1-10 (future)
