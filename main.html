@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiChess • Play Chess Online</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@lichess-org/chessground@10.1.0/assets/chessground.base.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@lichess-org/chessground@10.1.0/assets/chessground.brown.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@lichess-org/chessground@10.1.0/assets/chessground.cburnett.css"/>
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <div id="topbar">
+        <div class="logo-section">
+            <img src="/img/pionV.png" alt="logo" class="logo">
+            <span class="title">HiChess</span>
+        </div>
+        <div class="info-section">
+            <span id="version">v1.0</span>
+        </div>
+    </div>
+
+    <!-- Game Mode Modal -->
+    <div id="gameModeModal" class="modal">
+        <div class="modal-content">
+            <h2>Choose Game Mode</h2>
+            <div class="modal-buttons">
+                <button id="standardGameBtn" class="modal-btn">Standard Game</button>
+                <button id="endgameBtn" class="modal-btn endgame-btn">Random Endgame</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="container">
+        <div id="sidebar">
+            <div class="panel">
+                <h3>📊 Game Info</h3>
+                <div id="status" class="status-box">White to move</div>
+                <div class="move-counter">
+                    <span>Moves: <strong id="moveCount">0</strong></span>
+                </div>
+                <div id="endgameType" class="endgame-type" style="display: none;">
+                    <p id="endgameTypeText"></p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>🎮 Controls</h3>
+                <button id="newGameBtn" class="btn-primary">New Game</button>
+                <button id="newEndgameBtn" class="btn-secondary" style="display: none;">New Endgame</button>
+                <button id="undoBtn" class="btn-secondary" disabled>Undo</button>
+                <button id="resetBtn" class="btn-secondary">Reset</button>
+            </div>
+
+            <div class="panel">
+                <h3>📋 Position</h3>
+                <textarea id="fenDisplay" class="fen-box" readonly></textarea>
+                <button id="copyFenBtn" class="btn-small">Copy FEN</button>
+            </div>
+        </div>
+
+        <div id="main-game">
+            <div id="board" class="chessboard"></div>
+        </div>
+
+        <div id="right-panel">
+            <div class="panel">
+                <h3>👥 Players</h3>
+                <div class="player white-player">
+                    <span>⚪ White (You)</span>
+                </div>
+                <div class="player black-player">
+                    <span>⚫ Black (AI)</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>ℹ️ Help</h3>
+                <ul class="help-text">
+                    <li>Drag pieces to move</li>
+                    <li>Green squares = legal moves</li>
+                    <li>AI plays automatically</li>
+                    <li>Click "New Game" to restart</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/js/main.js"></script>
+</body>
+</html>
