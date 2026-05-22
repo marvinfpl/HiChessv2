@@ -103,19 +103,20 @@ def generate_random_endgame():
         "playerColor": "white" if player_color == WHITE else "black"
     }
 
-@app.get("/")
-def read_landing():
-    with open('landing.html') as f:
-        return HTMLResponse(f.read())
-
-@app.get("/game")
-def read_game():
-    with open('main.html') as f:
-        return HTMLResponse(f.read())
-
-@app.get("/api/random-endgame")
-def random_endgame():
-    return generate_random_endgame()
+def get_game_over_reason(board: Board) -> str:
+    if board.is_checkmate():
+        return "checkmate"
+    elif board.is_stalemate():
+        return "stalemate"
+    elif board.is_insufficient_material():
+        return "insufficient_material"
+    elif board.is_seventyfive_moves():
+        return "seventy_five_moves"
+    elif board.is_fivefold_repetition():
+        return "fivefold_repetition"
+    elif board.is_game_over():
+        return "draw"
+    return "unknown"
 
 def get_best_move_stockfish(fen: str) -> str:
     global engine
@@ -136,6 +137,20 @@ def get_best_move_stockfish(fen: str) -> str:
         legal_moves = list(board.legal_moves)
         return random.choice(legal_moves).uci() if legal_moves else None
 
+@app.get("/")
+def read_landing():
+    with open('landing.html') as f:
+        return HTMLResponse(f.read())
+
+@app.get("/game")
+def read_game():
+    with open('main.html') as f:
+        return HTMLResponse(f.read())
+
+@app.get("/api/random-endgame")
+def random_endgame():
+    return generate_random_endgame()
+
 @app.post("/api/validate-move")
 def validate_move(request: MoveRequest):
     try:
@@ -148,7 +163,8 @@ def validate_move(request: MoveRequest):
                 "valid": True,
                 "fen": board.fen(),
                 "isGameOver": board.is_game_over(),
-                "result": board.result() if board.is_game_over() else None
+                "result": board.result() if board.is_game_over() else None,
+                "gameOverReason": get_game_over_reason(board) if board.is_game_over() else None
             }
         else:
             raise HTTPException(status_code=400, detail="Illegal move")
@@ -178,7 +194,8 @@ def get_ai_move(request: AIRequest):
             "move": move_uci,
             "fen": board.fen(),
             "isGameOver": board.is_game_over(),
-            "result": board.result() if board.is_game_over() else None
+            "result": board.result() if board.is_game_over() else None,
+            "gameOverReason": get_game_over_reason(board) if board.is_game_over() else None
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -197,6 +197,17 @@ button {
     cursor: not-allowed;
 }
 
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #e53e3e;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 101, 101, 0.4);
+}
+
 .btn-small {
     padding: 8px;
     font-size: 12px;

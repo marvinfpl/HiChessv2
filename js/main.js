@@ -25,6 +25,7 @@ const endgameBtn = document.getElementById('endgameBtn');
 const newEndgameBtn = document.getElementById('newEndgameBtn');
 const endgameTypeEl = document.getElementById('endgameType');
 const endgameTypeTextEl = document.getElementById('endgameTypeText');
+const resignBtn = document.getElementById('resignBtn');
 
 function buildDests() {
     const dests = new Map();
@@ -88,6 +89,15 @@ function updateStatus() {
     } else if (chess.isDraw()) {
         statusEl.textContent = '= Draw!';
         gameActive = false;
+    } else if (chess.isStalemate()) {
+        statusEl.textContent = '= Stalemate! Draw.';
+        gameActive = false;
+    } else if (chess.isInsufficientMaterial()) {
+        statusEl.textContent = '= Insufficient material! Draw.';
+        gameActive = false;
+    } else if (chess.isThreefoldRepetition()) {
+        statusEl.textContent = '= Threefold repetition! Draw.';
+        gameActive = false;
     } else if (chess.inCheck()) {
         statusEl.textContent = `⚠ ${chess.turn() === 'w' ? 'White' : 'Black'} is in check!`;
     } else {
@@ -108,7 +118,7 @@ function makeMove(from, to) {
         moveHistory.push(move);
         moveCount++;
         updateBoard();
-        if (playerColor === 'white' && chess.turn() === 'b') {
+        if (chess.turn() !== playerColor && gameActive && !chess.isGameOver()) {
             setTimeout(playAI, 500);
         }
     }
@@ -173,6 +183,15 @@ function copyFEN() {
             copyFenBtn.textContent = originalText;
         }, 2000);
     });
+}
+
+function resign() {
+    if (!gameActive) return;
+
+    const winner = playerColor === 'white' ? 'Black' : 'White';
+    statusEl.textContent = `${winner} wins! (${playerColor} resigned)`;
+    gameActive = false;
+    ground.set({ movable: { color: undefined } });
 }
 
 async function loadRandomEndgame() {
@@ -256,6 +275,11 @@ resetBtn.addEventListener('click', () => {
     }
 });
 copyFenBtn.addEventListener('click', copyFEN);
+resignBtn.addEventListener('click', () => {
+    if (confirm(`Are you sure? ${playerColor} will resign.`)) {
+        resign();
+    }
+});
 
 // Modal event listeners
 standardGameBtn.addEventListener('click', () => {
