@@ -57,42 +57,55 @@ class AIRequest(BaseModel):
 # Endgame generator
 ENDGAME_TEMPLATES = {
     "rook_vs_king": [
-        "8/8/4k3/8/8/4K3/R7/8 w - - 0 1",
-        "8/8/8/3k4/8/4K3/6R1/8 w - - 0 1",
-        "8/8/8/8/2k5/4K3/R7/8 w - - 0 1",
+        {"fen": "8/8/4k3/8/8/4K3/R7/8 w - - 0 1", "difficulty": 1},
+        {"fen": "8/8/8/3k4/8/4K3/6R1/8 w - - 0 1", "difficulty": 2},
+        {"fen": "8/8/8/8/2k5/4K3/R7/8 w - - 0 1", "difficulty": 3},
     ],
     "queen_vs_king": [
-        "8/8/4k3/8/8/4K3/Q7/8 w - - 0 1",
-        "8/8/8/3k4/8/4K3/6Q1/8 w - - 0 1",
-        "8/8/8/8/2k5/4K3/Q7/8 w - - 0 1",
+        {"fen": "8/8/4k3/8/8/4K3/Q7/8 w - - 0 1", "difficulty": 1},
+        {"fen": "8/8/8/3k4/8/4K3/6Q1/8 w - - 0 1", "difficulty": 2},
+        {"fen": "8/8/8/8/2k5/4K3/Q7/8 w - - 0 1", "difficulty": 3},
     ],
     "bishop_vs_king": [
-        "8/8/4k3/8/8/4K3/B7/8 w - - 0 1",
-        "8/8/8/3k4/8/4K3/6B1/8 w - - 0 1",
-        "8/8/8/8/2k5/4K3/B7/8 w - - 0 1",
+        {"fen": "8/8/4k3/8/8/4K3/B7/8 w - - 0 1", "difficulty": 1},
+        {"fen": "8/8/8/3k4/8/4K3/6B1/8 w - - 0 1", "difficulty": 2},
+        {"fen": "8/8/8/8/2k5/4K3/B7/8 w - - 0 1", "difficulty": 3},
     ],
     "knight_vs_king": [
-        "8/8/4k3/8/8/4K3/N7/8 w - - 0 1",
-        "8/8/8/3k4/8/4K3/6N1/8 w - - 0 1",
-        "8/8/8/8/2k5/4K3/N7/8 w - - 0 1",
+        {"fen": "8/8/4k3/8/8/4K3/N7/8 w - - 0 1", "difficulty": 1},
+        {"fen": "8/8/8/3k4/8/4K3/6N1/8 w - - 0 1", "difficulty": 2},
+        {"fen": "8/8/8/8/2k5/4K3/N7/8 w - - 0 1", "difficulty": 3},
     ],
     "pawn_vs_king": [
-        "8/8/4k3/8/4P3/4K3/8/8 w - - 0 1",
-        "8/8/8/3k4/8/4K2P/8/8 w - - 0 1",
-        "8/8/8/8/2k3P1/4K3/8/8 w - - 0 1",
+        {"fen": "8/8/4k3/8/4P3/4K3/8/8 w - - 0 1", "difficulty": 1},
+        {"fen": "8/8/8/3k4/8/4K2P/8/8 w - - 0 1", "difficulty": 2},
+        {"fen": "8/8/8/8/2k3P1/4K3/8/8 w - - 0 1", "difficulty": 3},
     ],
 }
 
-def generate_random_endgame():
+def generate_random_endgame(rating: int = 1200):
+    # Determine allowed difficulties by rating
+    if rating < 1400:
+        allowed_difficulties = [1, 2]
+    else:
+        allowed_difficulties = [1, 2, 3]
+
+    # Pick random endgame type
     endgame_type = random.choice(list(ENDGAME_TEMPLATES.keys()))
-    fen_template = random.choice(ENDGAME_TEMPLATES[endgame_type])
+
+    # Filter templates by difficulty
+    filtered = [t for t in ENDGAME_TEMPLATES[endgame_type]
+                if t["difficulty"] in allowed_difficulties]
+
+    # Pick random from filtered templates
+    template = random.choice(filtered)
+    fen_template = template["fen"]
     board = Board(fen_template)
 
     player_color = random.choice([WHITE, BLACK])
 
-    # If player is black, switch the turn (fen already has "w", we need "b")
+    # If player is black, switch the turn
     if player_color == BLACK:
-        # Extract FEN parts and swap the turn
         parts = board.fen().split()
         parts[1] = 'b'
         board = Board(' '.join(parts))
@@ -148,8 +161,8 @@ def read_game():
         return HTMLResponse(f.read())
 
 @app.get("/api/random-endgame")
-def random_endgame():
-    return generate_random_endgame()
+def random_endgame(rating: int = 1200):
+    return generate_random_endgame(rating)
 
 @app.post("/api/validate-move")
 def validate_move(request: MoveRequest):

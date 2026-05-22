@@ -11,6 +11,11 @@ let moveHistory = [];
 let currentEndgameType = null;
 let isEndgameMode = false;
 
+// Rating system
+let playerRating = JSON.parse(localStorage.getItem('playerRating')) || 1200;
+let ratingHistory = JSON.parse(localStorage.getItem('ratingHistory')) || [];
+const AI_RATING = 1800;
+
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status');
 const fenEl = document.getElementById('fenDisplay');
@@ -26,6 +31,42 @@ const newEndgameBtn = document.getElementById('newEndgameBtn');
 const endgameTypeEl = document.getElementById('endgameType');
 const endgameTypeTextEl = document.getElementById('endgameTypeText');
 const resignBtn = document.getElementById('resignBtn');
+
+function calculateEloChange(result) {
+    const K = 32;
+    const resultValue = result === 'win' ? 1.0 : (result === 'loss' ? 0.0 : 0.5);
+    const expected = 1 / (1 + Math.pow(10, (AI_RATING - playerRating) / 400));
+    return Math.round(K * (resultValue - expected));
+}
+
+function endGame(result) {
+    if (!gameActive) return;
+
+    const change = calculateEloChange(result);
+    const oldRating = playerRating;
+    playerRating += change;
+
+    localStorage.setItem('playerRating', JSON.stringify(playerRating));
+    ratingHistory.push({
+        date: new Date().toISOString(),
+        type: currentEndgameType,
+        result,
+        ratingBefore: oldRating,
+        ratingAfter: playerRating
+    });
+    localStorage.setItem('ratingHistory', JSON.stringify(ratingHistory));
+
+    updateRatingDisplay(change);
+    gameActive = false;
+}
+
+function updateRatingDisplay(delta) {
+    const sign = delta >= 0 ? '+' : '';
+    const ratingDisplay = document.getElementById('ratingDisplay');
+    if (ratingDisplay) {
+        ratingDisplay.textContent = `Rating: ${playerRating} (${sign}${delta})`;
+    }
+}
 
 function buildDests() {
     const dests = new Map();
@@ -84,18 +125,25 @@ function updateBoard() {
 
 function updateStatus() {
     if (chess.isCheckmate()) {
-        statusEl.textContent = `✓ Checkmate! ${chess.turn() === 'w' ? 'Black' : 'White'} wins!`;
+        const losingColor = chess.turn() === 'w' ? 'white' : 'black';
+        const result = playerColor === losingColor ? 'loss' : 'win';
+        endGame(result);
+        statusEl.textContent = `✓ Checkmate! ${losingColor === 'white' ? 'Black' : 'White'} wins!`;
         gameActive = false;
     } else if (chess.isDraw()) {
+        endGame('draw');
         statusEl.textContent = '= Draw!';
         gameActive = false;
     } else if (chess.isStalemate()) {
+        endGame('draw');
         statusEl.textContent = '= Stalemate! Draw.';
         gameActive = false;
     } else if (chess.isInsufficientMaterial()) {
+        endGame('draw');
         statusEl.textContent = '= Insufficient material! Draw.';
         gameActive = false;
     } else if (chess.isThreefoldRepetition()) {
+        endGame('draw');
         statusEl.textContent = '= Threefold repetition! Draw.';
         gameActive = false;
     } else if (chess.inCheck()) {
@@ -187,16 +235,14 @@ function copyFEN() {
 
 function resign() {
     if (!gameActive) return;
-
     const winner = playerColor === 'white' ? 'Black' : 'White';
+    endGame('loss');
     statusEl.textContent = `${winner} wins! (${playerColor} resigned)`;
-    gameActive = false;
-    ground.set({ movable: { color: undefined } });
 }
 
 async function loadRandomEndgame() {
     try {
-        const res = await fetch(`${API_BASE}/api/random-endgame`);
+        const res = await fetch(`${API_BASE}/api/random-endgame?rating=${playerRating}`);
         const data = await res.json();
 
         chess.load(data.fen);
@@ -296,5 +342,11 @@ newEndgameBtn.addEventListener('click', loadRandomEndgame);
 
 // Show modal on startup
 gameModeModal.style.display = 'flex';
+
+// Initialize rating display
+const ratingDisplay = document.getElementById('ratingDisplay');
+if (ratingDisplay) {
+    ratingDisplay.textContent = `Rating: ${playerRating}`;
+}
 
 updateBoard();

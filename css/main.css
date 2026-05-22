@@ -62,6 +62,13 @@ body {
     opacity: 0.7;
 }
 
+#ratingDisplay {
+    font-weight: bold;
+    color: #4a90e2;
+    margin-right: 20px;
+    font-size: 14px;
+}
+
 #container {
     margin-top: 70px;
     padding: 20px;
