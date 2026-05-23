@@ -161,8 +161,42 @@ def read_game():
         return HTMLResponse(f.read())
 
 @app.get("/api/random-endgame")
-def random_endgame(rating: int = 1200):
-    return generate_random_endgame(rating)
+def random_endgame(rating: int = 1200, type: str = None):
+    if type and type in ENDGAME_TEMPLATES:
+        # Load specific endgame type
+        endgame_type = type
+    else:
+        # Random type
+        endgame_type = random.choice(list(ENDGAME_TEMPLATES.keys()))
+
+    # Determine allowed difficulties by rating
+    if rating < 1400:
+        allowed_difficulties = [1, 2]
+    else:
+        allowed_difficulties = [1, 2, 3]
+
+    # Filter templates by difficulty
+    filtered = [t for t in ENDGAME_TEMPLATES[endgame_type]
+                if t["difficulty"] in allowed_difficulties]
+
+    # Pick random from filtered templates
+    template = random.choice(filtered)
+    fen_template = template["fen"]
+    board = Board(fen_template)
+
+    player_color = random.choice([WHITE, BLACK])
+
+    # If player is black, switch the turn
+    if player_color == BLACK:
+        parts = board.fen().split()
+        parts[1] = 'b'
+        board = Board(' '.join(parts))
+
+    return {
+        "fen": board.fen(),
+        "type": endgame_type.replace("_", " "),
+        "playerColor": "white" if player_color == WHITE else "black"
+    }
 
 @app.post("/api/validate-move")
 def validate_move(request: MoveRequest):

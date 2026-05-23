@@ -21,72 +21,83 @@
         </div>
     </div>
 
-    <!-- Game Mode Modal -->
-    <div id="gameModeModal" class="modal">
-        <div class="modal-content">
-            <h2>Choose Game Mode</h2>
-            <div class="modal-buttons">
-                <button id="standardGameBtn" class="modal-btn">Standard Game</button>
-                <button id="endgameBtn" class="modal-btn endgame-btn">Random Endgame</button>
-            </div>
-        </div>
-    </div>
-
     <div id="container">
-        <div id="sidebar">
-            <div class="panel">
-                <h3>📊 Game Info</h3>
-                <div id="status" class="status-box">White to move</div>
-                <div class="move-counter">
-                    <span>Moves: <strong id="moveCount">0</strong></span>
-                </div>
-                <div id="endgameType" class="endgame-type" style="display: none;">
-                    <p id="endgameTypeText"></p>
-                </div>
-            </div>
+        <!-- LEFT: Empty space -->
+        <div id="left-spacer"></div>
 
-            <div class="panel">
-                <h3>🎮 Controls</h3>
-                <button id="newGameBtn" class="btn-primary">New Game</button>
-                <button id="newEndgameBtn" class="btn-secondary" style="display: none;">New Endgame</button>
-                <button id="undoBtn" class="btn-secondary" disabled>Undo</button>
-                <button id="resetBtn" class="btn-secondary">Reset</button>
-                <button id="resignBtn" class="btn-danger">Resign</button>
-            </div>
-
-            <div class="panel">
-                <h3>📋 Position</h3>
-                <textarea id="fenDisplay" class="fen-box" readonly></textarea>
-                <button id="copyFenBtn" class="btn-small">Copy FEN</button>
-            </div>
-        </div>
-
+        <!-- CENTER: Board -->
         <div id="main-game">
             <div id="board" class="chessboard"></div>
         </div>
 
+        <!-- RIGHT: Dashboard / Game Controls -->
         <div id="right-panel">
-            <div class="panel">
-                <h3>👥 Players</h3>
-                <div class="player white-player">
-                    <span>⚪ White (You)</span>
-                </div>
-                <div class="player black-player">
-                    <span>⚫ Black (AI)</span>
+            <!-- Endgame Selection Dashboard (shown when not in game) -->
+            <div id="endgameDashboard" class="dashboard">
+                <h2>Endgame Dashboard</h2>
+                <div class="endgame-buttons">
+                    <button class="endgame-btn" data-type="pawn_vs_king">
+                        <span class="btn-label">Pawns</span>
+                        <span class="btn-desc">King & Pawn vs King</span>
+                    </button>
+                    <button class="endgame-btn" data-type="rook_vs_king">
+                        <span class="btn-label">Rook</span>
+                        <span class="btn-desc">Rook vs King</span>
+                    </button>
+                    <button class="endgame-btn" data-type="queen_vs_king">
+                        <span class="btn-label">Queen</span>
+                        <span class="btn-desc">Queen vs King</span>
+                    </button>
+                    <button class="endgame-btn" data-type="bishop_vs_king">
+                        <span class="btn-label">Bishop</span>
+                        <span class="btn-desc">Bishop vs King</span>
+                    </button>
+                    <button class="endgame-btn" data-type="knight_vs_king">
+                        <span class="btn-label">Knight</span>
+                        <span class="btn-desc">Knight vs King</span>
+                    </button>
+                    <button class="endgame-btn random-btn" id="randomEndgameBtn">
+                        <span class="btn-label">Random</span>
+                        <span class="btn-desc">Random Endgame</span>
+                    </button>
                 </div>
             </div>
 
-            <div class="panel">
-                <h3>ℹ️ Help</h3>
-                <ul class="help-text">
-                    <li>Drag pieces to move</li>
-                    <li>Green squares = legal moves</li>
-                    <li>AI plays automatically</li>
-                    <li>Click "New Game" to restart</li>
-                </ul>
+            <!-- Game Info Panel (shown during game) -->
+            <div id="gamePanel" class="game-panel" style="display: none;">
+                <div class="opponent-label">Opponent</div>
+
+                <div class="game-info">
+                    <div id="status" class="status-box">White to move</div>
+                    <div class="move-counter">
+                        <span>Moves: <strong id="moveCount">0</strong></span>
+                    </div>
+                </div>
+
+                <!-- Move Navigation -->
+                <div class="move-navigation">
+                    <button class="nav-btn" id="firstMoveBtn" title="First move">⏮</button>
+                    <button class="nav-btn" id="prevMoveBtn" title="Previous move">◀</button>
+                    <button class="nav-btn" id="nextMoveBtn" title="Next move">▶</button>
+                    <button class="nav-btn" id="lastMoveBtn" title="Last move">⏭</button>
+                </div>
+
+                <!-- Moves List -->
+                <div class="moves-list" id="movesList"></div>
+
+                <div class="controls-group">
+                    <button id="newEndgameBtn" class="btn-primary">New Endgame</button>
+                    <button id="undoBtn" class="btn-secondary" disabled>Undo</button>
+                    <button id="resignBtn" class="btn-danger">Resign</button>
+                </div>
+
+                <div class="result-box" id="resultBox" style="display: none;"></div>
             </div>
         </div>
     </div>
+
+    <!-- Player indicator at bottom left -->
+    <div id="playerIndicator" class="player-indicator">You (White)</div>
 
     <script type="module" src="/js/main.js"></script>
 </body>

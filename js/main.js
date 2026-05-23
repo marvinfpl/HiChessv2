@@ -5,68 +5,31 @@ const API_BASE = location.origin;
 const chess = new Chess();
 let ground;
 let playerColor = 'white';
-let gameActive = true;
+let gameActive = false;
 let moveCount = 0;
 let moveHistory = [];
 let currentEndgameType = null;
-let isEndgameMode = false;
+let selectedEndgameType = null;
 
 // Rating system
 let playerRating = JSON.parse(localStorage.getItem('playerRating')) || 1200;
 let ratingHistory = JSON.parse(localStorage.getItem('ratingHistory')) || [];
 const AI_RATING = 1800;
 
+// DOM Elements
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status');
 const fenEl = document.getElementById('fenDisplay');
 const moveCountEl = document.getElementById('moveCount');
-const newGameBtn = document.getElementById('newGameBtn');
-const undoBtn = document.getElementById('undoBtn');
-const resetBtn = document.getElementById('resetBtn');
-const copyFenBtn = document.getElementById('copyFenBtn');
-const gameModeModal = document.getElementById('gameModeModal');
-const standardGameBtn = document.getElementById('standardGameBtn');
-const endgameBtn = document.getElementById('endgameBtn');
 const newEndgameBtn = document.getElementById('newEndgameBtn');
-const endgameTypeEl = document.getElementById('endgameType');
-const endgameTypeTextEl = document.getElementById('endgameTypeText');
+const undoBtn = document.getElementById('undoBtn');
 const resignBtn = document.getElementById('resignBtn');
-
-function calculateEloChange(result) {
-    const K = 32;
-    const resultValue = result === 'win' ? 1.0 : (result === 'loss' ? 0.0 : 0.5);
-    const expected = 1 / (1 + Math.pow(10, (AI_RATING - playerRating) / 400));
-    return Math.round(K * (resultValue - expected));
-}
-
-function endGame(result) {
-    if (!gameActive) return;
-
-    const change = calculateEloChange(result);
-    const oldRating = playerRating;
-    playerRating += change;
-
-    localStorage.setItem('playerRating', JSON.stringify(playerRating));
-    ratingHistory.push({
-        date: new Date().toISOString(),
-        type: currentEndgameType,
-        result,
-        ratingBefore: oldRating,
-        ratingAfter: playerRating
-    });
-    localStorage.setItem('ratingHistory', JSON.stringify(ratingHistory));
-
-    updateRatingDisplay(change);
-    gameActive = false;
-}
-
-function updateRatingDisplay(delta) {
-    const sign = delta >= 0 ? '+' : '';
-    const ratingDisplay = document.getElementById('ratingDisplay');
-    if (ratingDisplay) {
-        ratingDisplay.textContent = `Rating: ${playerRating} (${sign}${delta})`;
-    }
-}
+const copyFenBtn = document.getElementById('copyFenBtn');
+const endgameDashboard = document.getElementById('endgameDashboard');
+const gamePanel = document.getElementById('gamePanel');
+const resultBox = document.getElementById('resultBox');
+const playerIndicator = document.getElementById('playerIndicator');
+const randomEndgameBtn = document.getElementById('randomEndgameBtn');
 
 function buildDests() {
     const dests = new Map();
@@ -123,29 +86,77 @@ function updateBoard() {
     updateFEN();
 }
 
+function calculateEloChange(result) {
+    const K = 32;
+    const resultValue = result === 'win' ? 1.0 : (result === 'loss' ? 0.0 : 0.5);
+    const expected = 1 / (1 + Math.pow(10, (AI_RATING - playerRating) / 400));
+    return Math.round(K * (resultValue - expected));
+}
+
+function endGame(result) {
+    if (!gameActive) return;
+
+    const change = calculateEloChange(result);
+    const oldRating = playerRating;
+    playerRating += change;
+
+    localStorage.setItem('playerRating', JSON.stringify(playerRating));
+    ratingHistory.push({
+        date: new Date().toISOString(),
+        type: currentEndgameType,
+        result,
+        ratingBefore: oldRating,
+        ratingAfter: playerRating
+    });
+    localStorage.setItem('ratingHistory', JSON.stringify(ratingHistory));
+
+    gameActive = false;
+    updateRatingDisplay(change);
+    updateBoard();
+}
+
+function updateRatingDisplay(delta) {
+    const sign = delta >= 0 ? '+' : '';
+    const ratingDisplay = document.getElementById('ratingDisplay');
+    if (ratingDisplay) {
+        ratingDisplay.textContent = `Rating: ${playerRating} (${sign}${delta})`;
+        setTimeout(() => {
+            ratingDisplay.textContent = `Rating: ${playerRating}`;
+        }, 3000);
+    }
+}
+
 function updateStatus() {
     if (chess.isCheckmate()) {
         const losingColor = chess.turn() === 'w' ? 'white' : 'black';
         const result = playerColor === losingColor ? 'loss' : 'win';
+        const winner = losingColor === 'white' ? 'Black' : 'White';
+
+        resultBox.style.display = 'block';
+        resultBox.textContent = `Checkmate! ${winner} wins!`;
+        statusEl.textContent = `✓ ${winner} wins!`;
+
         endGame(result);
-        statusEl.textContent = `✓ Checkmate! ${losingColor === 'white' ? 'Black' : 'White'} wins!`;
-        gameActive = false;
     } else if (chess.isDraw()) {
-        endGame('draw');
+        resultBox.style.display = 'block';
+        resultBox.textContent = 'Draw!';
         statusEl.textContent = '= Draw!';
-        gameActive = false;
+        endGame('draw');
     } else if (chess.isStalemate()) {
-        endGame('draw');
+        resultBox.style.display = 'block';
+        resultBox.textContent = 'Stalemate! Draw.';
         statusEl.textContent = '= Stalemate! Draw.';
-        gameActive = false;
+        endGame('draw');
     } else if (chess.isInsufficientMaterial()) {
-        endGame('draw');
+        resultBox.style.display = 'block';
+        resultBox.textContent = 'Insufficient material! Draw.';
         statusEl.textContent = '= Insufficient material! Draw.';
-        gameActive = false;
-    } else if (chess.isThreefoldRepetition()) {
         endGame('draw');
+    } else if (chess.isThreefoldRepetition()) {
+        resultBox.style.display = 'block';
+        resultBox.textContent = 'Threefold repetition! Draw.';
         statusEl.textContent = '= Threefold repetition! Draw.';
-        gameActive = false;
+        endGame('draw');
     } else if (chess.inCheck()) {
         statusEl.textContent = `⚠ ${chess.turn() === 'w' ? 'White' : 'Black'} is in check!`;
     } else {
@@ -173,7 +184,7 @@ function makeMove(from, to) {
 }
 
 async function playAI() {
-    if (!gameActive || chess.turn() === 'w') return;
+    if (!gameActive) return;
 
     try {
         const res = await fetch(`${API_BASE}/api/ai-move`, {
@@ -201,7 +212,7 @@ function resetGame() {
     chess.reset();
     moveHistory = [];
     moveCount = 0;
-    gameActive = true;
+    gameActive = false;
     ground.set({ fen: chess.fen() });
     updateBoard();
 }
@@ -213,7 +224,6 @@ function undoLastMove() {
         moveCount--;
         updateBoard();
 
-        // If the last move was by AI, undo that too
         if (moveHistory.length > 0 && chess.turn() === 'w') {
             moveHistory.pop();
             chess.undo();
@@ -237,32 +247,40 @@ function resign() {
     if (!gameActive) return;
     const winner = playerColor === 'white' ? 'Black' : 'White';
     endGame('loss');
-    statusEl.textContent = `${winner} wins! (${playerColor} resigned)`;
+    resultBox.style.display = 'block';
+    resultBox.textContent = `${winner} wins! (You resigned)`;
+    statusEl.textContent = `${winner} wins! (You resigned)`;
 }
 
-async function loadRandomEndgame() {
+async function loadEndgame(endgameType = null) {
     try {
-        const res = await fetch(`${API_BASE}/api/random-endgame?rating=${playerRating}`);
+        let url = `${API_BASE}/api/random-endgame?rating=${playerRating}`;
+        if (endgameType) {
+            url += `&type=${endgameType}`;
+        }
+
+        const res = await fetch(url);
         const data = await res.json();
 
         chess.load(data.fen);
         playerColor = data.playerColor;
         currentEndgameType = data.type;
-        isEndgameMode = true;
 
         moveHistory = [];
         moveCount = 0;
         gameActive = true;
+        resultBox.style.display = 'none';
 
-        // Update board orientation
+        // Update UI
         ground.set({ orientation: playerColor });
         updateBoard();
 
-        // Show endgame info and new endgame button
-        endgameTypeEl.style.display = 'block';
-        endgameTypeTextEl.textContent = `${data.type} - You play ${playerColor}`;
-        newEndgameBtn.style.display = 'block';
-        newGameBtn.style.display = 'none';
+        // Show game panel, hide dashboard
+        endgameDashboard.style.display = 'none';
+        gamePanel.style.display = 'flex';
+
+        // Update player indicator
+        playerIndicator.textContent = `You (${playerColor === 'white' ? 'White' : 'Black'})`;
 
         // If player is black, AI plays first
         if (playerColor === 'black' && gameActive) {
@@ -274,33 +292,20 @@ async function loadRandomEndgame() {
     }
 }
 
-function startStandardGame() {
-    isEndgameMode = false;
-    playerColor = 'white';
-    currentEndgameType = null;
-
-    chess.reset();
-    moveHistory = [];
-    moveCount = 0;
-    gameActive = true;
-
-    ground.set({ orientation: playerColor });
-    updateBoard();
-
-    // Hide endgame info and new endgame button
-    endgameTypeEl.style.display = 'none';
-    newEndgameBtn.style.display = 'none';
-    newGameBtn.style.display = 'block';
+function showDashboard() {
+    endgameDashboard.style.display = 'block';
+    gamePanel.style.display = 'none';
+    resetGame();
 }
 
 // Initialize board
 ground = Chessground(boardEl, {
     fen: chess.fen(),
-    orientation: playerColor,
+    orientation: 'white',
     coordinates: true,
     movable: {
         free: false,
-        color: playerColor,
+        color: 'white',
         dests: buildDests(),
         showDests: true,
     },
@@ -312,41 +317,41 @@ ground = Chessground(boardEl, {
     }
 });
 
-// Event listeners
-newGameBtn.addEventListener('click', resetGame);
+// Event listeners - Game Controls
+newEndgameBtn.addEventListener('click', showDashboard);
 undoBtn.addEventListener('click', undoLastMove);
-resetBtn.addEventListener('click', () => {
-    if (confirm('Are you sure? This will reset the game.')) {
-        resetGame();
-    }
-});
-copyFenBtn.addEventListener('click', copyFEN);
 resignBtn.addEventListener('click', () => {
     if (confirm(`Are you sure? ${playerColor} will resign.`)) {
         resign();
     }
 });
+copyFenBtn.addEventListener('click', copyFEN);
 
-// Modal event listeners
-standardGameBtn.addEventListener('click', () => {
-    gameModeModal.style.display = 'none';
-    startStandardGame();
+// Event listeners - Endgame Selection
+document.querySelectorAll('.endgame-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const type = btn.dataset.type;
+        if (type === undefined) {
+            // Random button
+            loadEndgame();
+        } else {
+            loadEndgame(type);
+        }
+    });
 });
 
-endgameBtn.addEventListener('click', () => {
-    gameModeModal.style.display = 'none';
-    loadRandomEndgame();
+randomEndgameBtn.addEventListener('click', () => {
+    loadEndgame();
 });
-
-newEndgameBtn.addEventListener('click', loadRandomEndgame);
-
-// Show modal on startup
-gameModeModal.style.display = 'flex';
 
 // Initialize rating display
 const ratingDisplay = document.getElementById('ratingDisplay');
 if (ratingDisplay) {
     ratingDisplay.textContent = `Rating: ${playerRating}`;
 }
+
+// Show dashboard on startup
+endgameDashboard.style.display = 'block';
+gamePanel.style.display = 'none';
 
 updateBoard();
