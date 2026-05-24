@@ -10,6 +10,8 @@ let moveCount = 0;
 let moveHistory = [];
 let currentEndgameType = null;
 let selectedEndgameType = null;
+let currentNavPosition = 0; // Track which move we're viewing
+let initialFEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'; // Initial FEN of endgame
 
 // Rating system
 let playerRating = JSON.parse(localStorage.getItem('playerRating')) || 1200;
@@ -19,17 +21,20 @@ const AI_RATING = 1800;
 // DOM Elements
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status');
-const fenEl = document.getElementById('fenDisplay');
 const moveCountEl = document.getElementById('moveCount');
+const movesList = document.getElementById('movesList');
 const newEndgameBtn = document.getElementById('newEndgameBtn');
 const undoBtn = document.getElementById('undoBtn');
 const resignBtn = document.getElementById('resignBtn');
-const copyFenBtn = document.getElementById('copyFenBtn');
 const endgameDashboard = document.getElementById('endgameDashboard');
 const gamePanel = document.getElementById('gamePanel');
 const resultBox = document.getElementById('resultBox');
 const playerIndicator = document.getElementById('playerIndicator');
-const randomEndgameBtn = document.getElementById('randomEndgameBtn');
+const startGameBtn = document.getElementById('startGameBtn');
+const firstMoveBtn = document.getElementById('firstMoveBtn');
+const prevMoveBtn = document.getElementById('prevMoveBtn');
+const nextMoveBtn = document.getElementById('nextMoveBtn');
+const lastMoveBtn = document.getElementById('lastMoveBtn');
 
 function buildDests() {
     const dests = new Map();
@@ -83,7 +88,42 @@ function updateBoard() {
     });
 
     updateStatus();
-    updateFEN();
+}
+
+function updateMovesList() {
+    if (moveHistory.length === 0) {
+        movesList.innerHTML = '<div class="empty">No moves yet</div>';
+        return;
+    }
+
+    let html = '';
+    for (let i = 0; i < moveHistory.length; i++) {
+        const move = moveHistory[i];
+        const moveNum = Math.floor(i / 2) + 1;
+        const isWhiteMove = i % 2 === 0;
+
+        if (isWhiteMove) {
+            html += `<span class="move-item move-number">${moveNum}.</span> `;
+        }
+
+        const moveClass = i === currentNavPosition - 1 ? 'current' : 'nav-current';
+        const isCurrent = i === moveHistory.length - 1 && gameActive;
+
+        html += `<span class="move-item ${isCurrent ? 'current' : ''}" data-move-index="${i}">${move.san}</span> `;
+
+        if (!isWhiteMove) {
+            html += '<br>';
+        }
+    }
+
+    movesList.innerHTML = html;
+
+    // Add click listeners to moves
+    movesList.querySelectorAll('.move-item[data-move-index]').forEach(el => {
+        el.addEventListener('click', () => {
+            navigateToMove(parseInt(el.dataset.moveIndex) + 1);
+        });
+    });
 }
 
 function calculateEloChange(result) {
@@ -111,8 +151,11 @@ function endGame(result) {
     localStorage.setItem('ratingHistory', JSON.stringify(ratingHistory));
 
     gameActive = false;
+    currentNavPosition = moveHistory.length;
     updateRatingDisplay(change);
     updateBoard();
+    updateMovesList();
+    updateNavigationButtons();
 }
 
 function updateRatingDisplay(delta) {
@@ -167,16 +210,16 @@ function updateStatus() {
     undoBtn.disabled = moveHistory.length === 0;
 }
 
-function updateFEN() {
-    fenEl.value = chess.fen();
-}
-
 function makeMove(from, to) {
     const move = chess.move({ from, to, promotion: 'q' });
     if (move) {
         moveHistory.push(move);
         moveCount++;
+        currentNavPosition = moveHistory.length;
         updateBoard();
+        updateMovesList();
+        updateNavigationButtons();
+
         if (chess.turn() !== playerColor && gameActive && !chess.isGameOver()) {
             setTimeout(playAI, 500);
         }
@@ -200,7 +243,10 @@ async function playAI() {
             if (moveObj) {
                 moveHistory.push(moveObj);
                 moveCount++;
+                currentNavPosition = moveHistory.length;
                 updateBoard();
+                updateMovesList();
+                updateNavigationButtons();
             }
         }
     } catch (e) {
@@ -208,13 +254,43 @@ async function playAI() {
     }
 }
 
+function navigateToMove(moveIndex) {
+    // Replay from initial endgame position to this move
+    const tempChess = new Chess(initialFEN);
+
+    for (let i = 0; i < moveIndex && i < moveHistory.length; i++) {
+        tempChess.move(moveHistory[i]);
+    }
+
+    // Update the global chess instance to match
+    chess.load(tempChess.fen());
+    currentNavPosition = moveIndex;
+    updateNavigationButtons();
+    updateBoard();
+    updateMovesList();
+}
+
+function updateNavigationButtons() {
+    const hasMovesTotal = moveHistory.length > 0;
+    const atBeginning = currentNavPosition === 0;
+    const atEnd = currentNavPosition === moveHistory.length;
+
+    firstMoveBtn.disabled = atBeginning;
+    prevMoveBtn.disabled = atBeginning;
+    nextMoveBtn.disabled = atEnd;
+    lastMoveBtn.disabled = atEnd;
+}
+
 function resetGame() {
     chess.reset();
     moveHistory = [];
     moveCount = 0;
+    currentNavPosition = 0;
     gameActive = false;
     ground.set({ fen: chess.fen() });
     updateBoard();
+    updateMovesList();
+    updateNavigationButtons();
 }
 
 function undoLastMove() {
@@ -222,25 +298,21 @@ function undoLastMove() {
         moveHistory.pop();
         chess.undo();
         moveCount--;
+        currentNavPosition = moveHistory.length;
         updateBoard();
+        updateMovesList();
+        updateNavigationButtons();
 
         if (moveHistory.length > 0 && chess.turn() === 'w') {
             moveHistory.pop();
             chess.undo();
             moveCount--;
+            currentNavPosition = moveHistory.length;
             updateBoard();
+            updateMovesList();
+            updateNavigationButtons();
         }
     }
-}
-
-function copyFEN() {
-    navigator.clipboard.writeText(chess.fen()).then(() => {
-        const originalText = copyFenBtn.textContent;
-        copyFenBtn.textContent = '✓ Copied!';
-        setTimeout(() => {
-            copyFenBtn.textContent = originalText;
-        }, 2000);
-    });
 }
 
 function resign() {
@@ -252,50 +324,53 @@ function resign() {
     statusEl.textContent = `${winner} wins! (You resigned)`;
 }
 
-async function loadEndgame(endgameType = null) {
-    try {
-        let url = `${API_BASE}/api/random-endgame?rating=${playerRating}`;
-        if (endgameType) {
-            url += `&type=${endgameType}`;
-        }
 
-        const res = await fetch(url);
-        const data = await res.json();
-
-        chess.load(data.fen);
-        playerColor = data.playerColor;
-        currentEndgameType = data.type;
-
-        moveHistory = [];
-        moveCount = 0;
-        gameActive = true;
-        resultBox.style.display = 'none';
-
-        // Update UI
-        ground.set({ orientation: playerColor });
-        updateBoard();
-
-        // Show game panel, hide dashboard
-        endgameDashboard.style.display = 'none';
-        gamePanel.style.display = 'flex';
-
-        // Update player indicator
-        playerIndicator.textContent = `You (${playerColor === 'white' ? 'White' : 'Black'})`;
-
-        // If player is black, AI plays first
-        if (playerColor === 'black' && gameActive) {
-            setTimeout(playAI, 500);
-        }
-    } catch (e) {
-        console.error('Failed to load endgame:', e);
-        alert('Failed to load endgame. Try again.');
-    }
-}
 
 function showDashboard() {
     endgameDashboard.style.display = 'block';
     gamePanel.style.display = 'none';
     resetGame();
+}
+
+async function loadLichessPuzzle() {
+    try {
+        const url = `${API_BASE}/api/lichess-endgame?rating=${playerRating}`;
+        const res = await fetch(url);
+        
+        if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        
+        const data = await res.json();
+
+        chess.load(data.fen);
+        initialFEN = data.fen; // Save initial FEN for navigation
+        playerColor = data.playerColor;
+        currentEndgameType = data.name || data.type || 'Lichess Puzzle';
+
+        moveHistory = [];
+        moveCount = 0;
+        currentNavPosition = 0;
+        gameActive = true;
+        resultBox.style.display = 'none';
+
+        ground.set({ orientation: playerColor });
+        updateBoard();
+        updateMovesList();
+        updateNavigationButtons();
+
+        endgameDashboard.style.display = 'none';
+        gamePanel.style.display = 'flex';
+
+        playerIndicator.textContent = `You (${playerColor === 'white' ? 'White' : 'Black'})`;
+
+        if (playerColor === 'black' && gameActive) {
+            setTimeout(playAI, 500);
+        }
+    } catch (e) {
+        console.error('Failed to load Lichess puzzle:', e);
+        alert('Impossible de charger le puzzle. Vérifiez votre connexion internet et essayez à nouveau.');
+    }
 }
 
 // Initialize board
@@ -325,23 +400,31 @@ resignBtn.addEventListener('click', () => {
         resign();
     }
 });
-copyFenBtn.addEventListener('click', copyFEN);
 
-// Event listeners - Endgame Selection
-document.querySelectorAll('.endgame-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        const type = btn.dataset.type;
-        if (type === undefined) {
-            // Random button
-            loadEndgame();
-        } else {
-            loadEndgame(type);
-        }
-    });
+// Event listeners - Navigation
+firstMoveBtn.addEventListener('click', () => {
+    navigateToMove(0);
 });
 
-randomEndgameBtn.addEventListener('click', () => {
-    loadEndgame();
+prevMoveBtn.addEventListener('click', () => {
+    if (currentNavPosition > 0) {
+        navigateToMove(currentNavPosition - 1);
+    }
+});
+
+nextMoveBtn.addEventListener('click', () => {
+    if (currentNavPosition < moveHistory.length) {
+        navigateToMove(currentNavPosition + 1);
+    }
+});
+
+lastMoveBtn.addEventListener('click', () => {
+    navigateToMove(moveHistory.length);
+});
+
+// Event listeners - Start Game
+startGameBtn.addEventListener('click', () => {
+    loadLichessPuzzle();
 });
 
 // Initialize rating display
@@ -355,3 +438,5 @@ endgameDashboard.style.display = 'block';
 gamePanel.style.display = 'none';
 
 updateBoard();
+updateMovesList();
+updateNavigationButtons();

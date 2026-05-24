@@ -76,9 +76,9 @@ body {
     margin-top: 70px;
     padding: 20px;
     display: grid;
-    grid-template-columns: 1fr 600px 350px;
+    grid-template-columns: 1fr auto 350px;
     gap: 30px;
-    max-width: 1600px;
+    max-width: 2000px;
     margin-left: auto;
     margin-right: auto;
     min-height: calc(100vh - 70px);
@@ -196,6 +196,35 @@ body {
 .endgame-btn.random-btn:hover {
     border-color: var(--success);
     background: rgba(72, 187, 120, 0.1);
+}
+
+.endgame-btn.lichess-btn {
+    border-color: var(--warning);
+    background: rgba(237, 137, 54, 0.05);
+}
+
+.endgame-btn.lichess-btn:hover {
+    border-color: var(--warning);
+    background: rgba(237, 137, 54, 0.15);
+    transform: translateX(4px);
+}
+
+.endgame-btn.start-btn {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    padding: 24px;
+    font-size: 16px;
+}
+
+.endgame-btn.start-btn:hover {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+    transform: translateX(6px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.endgame-btn.start-btn .btn-label {
+    font-size: 16px;
 }
 
 .btn-label {
@@ -441,9 +470,10 @@ button {
 
 /* Player Indicator */
 .player-indicator {
-    position: fixed;
-    bottom: 20px;
+    position: absolute;
+    bottom: auto;
     left: 20px;
+    top: calc(70px + 20px + 700px + 20px);
     font-size: 12px;
     color: rgba(255, 255, 255, 0.7);
     font-weight: bold;
