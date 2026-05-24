@@ -270,7 +270,6 @@ function navigateToMove(moveIndex) {
 }
 
 function updateNavigationButtons() {
-    const hasMovesTotal = moveHistory.length > 0;
     const atBeginning = currentNavPosition === 0;
     const atEnd = currentNavPosition === moveHistory.length;
 
@@ -363,7 +362,7 @@ async function loadLichessPuzzle() {
 
         playerIndicator.textContent = `You (${playerColor === 'white' ? 'White' : 'Black'})`;
 
-        if (playerColor === 'black' && gameActive) {
+        if (gameActive && chess.turn() !== playerColor) {
             setTimeout(playAI, 500);
         }
     } catch (e) {

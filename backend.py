@@ -1,10 +1,12 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from chess import Board, Move, WHITE, BLACK
 import chess.engine
+import chess.pgn
+import io
 import random
 import os
 import requests
@@ -18,7 +20,7 @@ STOCKFISH_TIME_LIMIT = 1.0  # seconds
 
 # Lichess API Configuration
 LICHESS_API_BASE = "https://lichess.org/api"
-LICHESS_PUZZLE_ENDPOINT = f"{LICHESS_API_BASE}/puzzle/random"
+LICHESS_PUZZLE_ENDPOINT = f"{LICHESS_API_BASE}/puzzle/next"
 LICHESS_REQUEST_TIMEOUT = 5  # seconds
 
 app.add_middleware(
@@ -154,143 +156,75 @@ def get_ai_move(request: AIRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
 
-# Lichess API Integration
-def generate_advanced_endgame(rating: int = 1200):
-    """
-    Generates an advanced random endgame position based on rating.
-    Creates more complex and varied positions than templates.
-    """
-    endgame_types = [
-        'king_pawn_endgame',
-        'rook_endgame', 
-        'minor_piece_endgame',
-        'mixed_endgame',
-        'rook_pawn_endgame'
-    ]
-    
-    endgame_type = random.choice(endgame_types)
-    
-    # Base positions for different endgame types
-    base_positions = {
-        'king_pawn_endgame': [
-            '8/8/4k3/8/4P3/4K3/8/8 w - - 0 1',
-            '8/8/8/3k4/8/4K2P/8/8 w - - 0 1',
-            '8/8/8/8/2k3P1/4K3/8/8 w - - 0 1',
-            '8/2k5/8/8/4K2P/8/8/8 w - - 0 1',
-            '6k1/8/8/8/8/5K1P/8/8 w - - 0 1',
-        ],
-        'rook_endgame': [
-            '8/8/4k3/8/8/4K3/R7/8 w - - 0 1',
-            '8/8/8/3k4/8/4K3/6R1/8 w - - 0 1',
-            '8/8/8/8/2k5/4K3/R7/8 w - - 0 1',
-            '6k1/8/8/8/8/5K2/R7/8 w - - 0 1',
-            '8/2k5/8/8/R3K3/8/8/8 w - - 0 1',
-        ],
-        'minor_piece_endgame': [
-            '8/8/4k3/8/8/4K3/B7/8 w - - 0 1',
-            '8/8/4k3/8/8/4K3/N7/8 w - - 0 1',
-            '8/8/8/3k4/8/4K3/6B1/8 w - - 0 1',
-            '8/8/8/8/2k5/4K3/N7/8 w - - 0 1',
-            '6k1/8/8/8/8/5K2/B7/8 w - - 0 1',
-        ],
-        'mixed_endgame': [
-            '8/8/4k3/8/8/4K3/Q7/8 w - - 0 1',
-            '8/8/8/3k4/8/4K3/6Q1/8 w - - 0 1',
-            '8/8/8/8/2k5/4K3/Q7/8 w - - 0 1',
-            '6k1/8/8/8/8/5K2/Q7/8 w - - 0 1',
-            '8/2k5/8/8/R3K1B1/8/8/8 w - - 0 1',
-        ],
-        'rook_pawn_endgame': [
-            '8/8/4k3/4p3/4K3/R7/8/8 w - - 0 1',
-            '8/8/8/3k1p2/8/4K3/R7/8 w - - 0 1',
-            '8/2k5/8/4p3/R3K3/8/8/8 w - - 0 1',
-            '6k1/5p2/5K2/8/R7/8/8/8 w - - 0 1',
-            '8/8/3pk3/4p3/3RK3/8/8/8 w - - 0 1',
-        ]
-    }
-    
-    positions = base_positions.get(endgame_type, base_positions['king_pawn_endgame'])
-    fen = random.choice(positions)
-    
-    # Randomly shift pieces to different squares for variation
-    board = Board(fen)
-    
-    return {
-        "fen": board.fen(),
-        "type": endgame_type.replace("_", " "),
-        "source": "generated"
-    }
+def get_puzzle_fen_from_response(puzzle_data):
+    game_pgn = puzzle_data.get("game", {}).get("pgn", "")
+    initial_ply = puzzle_data.get("puzzle", {}).get("initialPly")
+
+    if not game_pgn or initial_ply is None:
+        raise ValueError("Invalid Lichess puzzle response: missing PGN or initial ply")
+
+    game = chess.pgn.read_game(io.StringIO(game_pgn))
+    if game is None:
+        raise ValueError("Could not parse PGN from Lichess response")
+
+    board = game.board()
+    ply_to_replay = int(initial_ply) - 1
+    if ply_to_replay < 0:
+        raise ValueError("Invalid initial ply")
+
+    for i, move in enumerate(game.mainline_moves(), start=1):
+        if i > ply_to_replay:
+            break
+        board.push(move)
+
+    return board.fen()
 
 @app.get("/api/lichess-endgame")
-def lichess_endgame(rating: int = 1200):
+def lichess_endgame():
     """
-    Get a random puzzle from Lichess and convert it to a playable endgame.
-    Falls back to local generation if Lichess API fails.
+    Get a random puzzle from Lichess and return an endgame position.
+    The player is assigned White or Black with a 50/50 chance.
     """
-    try:
-        # Try to fetch a puzzle from Lichess
-        response = requests.get(
-            LICHESS_PUZZLE_ENDPOINT,
-            timeout=LICHESS_REQUEST_TIMEOUT,
-            headers={"Accept": "application/json"}
-        )
-        response.raise_for_status()
-        
-        puzzle_data = response.json()
-        
-        # Extract puzzle information
-        puzzle_fen = puzzle_data.get("puzzle", {}).get("fen", "")
-        game_fen = puzzle_data.get("game", {}).get("fen", "")
-        
-        # Use puzzle FEN if available, otherwise game FEN
-        fen_to_use = puzzle_fen or game_fen
-        
-        if not fen_to_use:
-            raise ValueError("No FEN found in Lichess response")
-        
-        # Validate the FEN
-        board = Board(fen_to_use)
-        
-        # Randomly choose player color
-        player_color = random.choice([WHITE, BLACK])
-        fen = board.fen()
-        
-        # If player is black, we need to switch the turn in the FEN
-        if player_color == BLACK:
-            parts = fen.split()
-            parts[1] = 'b'  # Set turn to black
-            fen = ' '.join(parts)
-        
-        return {
-            "fen": fen,
-            "name": puzzle_data.get("puzzle", {}).get("name", "Lichess Puzzle"),
-            "url": puzzle_data.get("puzzle", {}).get("url", ""),
-            "playerColor": "white" if player_color == WHITE else "black",
-            "source": "lichess"
-        }
-    except Exception as e:
-        print(f"Warning: Lichess API failed ({e}), using local generation")
-        
-        # Fallback to local generation
-        try:
-            endgame_data = generate_advanced_endgame(rating)
-            player_color = random.choice([WHITE, BLACK])
-            fen = endgame_data["fen"]
-            
-            if player_color == BLACK:
-                parts = fen.split()
-                parts[1] = 'b'
-                fen = ' '.join(parts)
-            
-            return {
-                "fen": fen,
-                "name": endgame_data["type"],
-                "url": "",
-                "playerColor": "white" if player_color == WHITE else "black",
-                "source": "local"
-            }
-        except Exception as fallback_error:
-            print(f"Error in fallback: {fallback_error}")
-            raise HTTPException(status_code=500, detail="Could not generate endgame")
+    target_color = random.choice([WHITE, BLACK])
+    max_attempts = 8
 
+    for attempt in range(max_attempts):
+        try:
+            response = requests.get(
+                LICHESS_PUZZLE_ENDPOINT,
+                timeout=LICHESS_REQUEST_TIMEOUT,
+                headers={"Accept": "application/json"}
+            )
+            response.raise_for_status()
+
+            puzzle_data = response.json()
+            fen = get_puzzle_fen_from_response(puzzle_data)
+            board = Board(fen)
+
+            if board.turn != target_color:
+                if attempt == max_attempts - 1:
+                    raise ValueError("Could not find a puzzle matching the selected color")
+                continue
+
+            puzzle_id = puzzle_data.get("puzzle", {}).get("id", "")
+            puzzle_url = f"https://lichess.org/training/{puzzle_id}" if puzzle_id else ""
+            player_color = "white" if target_color == WHITE else "black"
+
+            return {
+                "fen": board.fen(),
+                "name": puzzle_data.get("game", {}).get("perf", {}).get("name", "Lichess Puzzle"),
+                "url": puzzle_url,
+                "playerColor": player_color,
+                "source": "lichess",
+                "solution": puzzle_data.get("puzzle", {}).get("solution", []),
+                "themes": puzzle_data.get("puzzle", {}).get("themes", []),
+                "rating": puzzle_data.get("puzzle", {}).get("rating"),
+                "pgn": puzzle_data.get("game", {}).get("pgn", "")
+            }
+        except Exception as e:
+            if attempt == max_attempts - 1:
+                raise HTTPException(status_code=502, detail=f"Lichess API failed: {e}")
+
+    raise HTTPException(status_code=502, detail="Could not fetch a Lichess puzzle for the chosen color")
