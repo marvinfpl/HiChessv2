@@ -9,7 +9,6 @@ let gameActive = false;
 let moveCount = 0;
 let moveHistory = [];
 let currentEndgameType = null;
-let selectedEndgameType = null;
 let currentNavPosition = 0; // Track which move we're viewing
 let initialFEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'; // Initial FEN of endgame
 

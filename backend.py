@@ -3,12 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from chess import Board, Move, Piece, KING, QUEEN, ROOK, BISHOP, KNIGHT, PAWN, WHITE, BLACK
+from chess import Board, Move, WHITE, BLACK
 import chess.engine
 import random
 import os
 import requests
-import time
 
 app = FastAPI()
 
@@ -61,67 +60,6 @@ class MoveRequest(BaseModel):
 class AIRequest(BaseModel):
     fen: str
 
-# Endgame generator
-ENDGAME_TEMPLATES = {
-    "rook_vs_king": [
-        {"fen": "8/8/4k3/8/8/4K3/R7/8 w - - 0 1", "difficulty": 1},
-        {"fen": "8/8/8/3k4/8/4K3/6R1/8 w - - 0 1", "difficulty": 2},
-        {"fen": "8/8/8/8/2k5/4K3/R7/8 w - - 0 1", "difficulty": 3},
-    ],
-    "queen_vs_king": [
-        {"fen": "8/8/4k3/8/8/4K3/Q7/8 w - - 0 1", "difficulty": 1},
-        {"fen": "8/8/8/3k4/8/4K3/6Q1/8 w - - 0 1", "difficulty": 2},
-        {"fen": "8/8/8/8/2k5/4K3/Q7/8 w - - 0 1", "difficulty": 3},
-    ],
-    "bishop_vs_king": [
-        {"fen": "8/8/4k3/8/8/4K3/B7/8 w - - 0 1", "difficulty": 1},
-        {"fen": "8/8/8/3k4/8/4K3/6B1/8 w - - 0 1", "difficulty": 2},
-        {"fen": "8/8/8/8/2k5/4K3/B7/8 w - - 0 1", "difficulty": 3},
-    ],
-    "knight_vs_king": [
-        {"fen": "8/8/4k3/8/8/4K3/N7/8 w - - 0 1", "difficulty": 1},
-        {"fen": "8/8/8/3k4/8/4K3/6N1/8 w - - 0 1", "difficulty": 2},
-        {"fen": "8/8/8/8/2k5/4K3/N7/8 w - - 0 1", "difficulty": 3},
-    ],
-    "pawn_vs_king": [
-        {"fen": "8/8/4k3/8/4P3/4K3/8/8 w - - 0 1", "difficulty": 1},
-        {"fen": "8/8/8/3k4/8/4K2P/8/8 w - - 0 1", "difficulty": 2},
-        {"fen": "8/8/8/8/2k3P1/4K3/8/8 w - - 0 1", "difficulty": 3},
-    ],
-}
-
-def generate_random_endgame(rating: int = 1200):
-    # Determine allowed difficulties by rating
-    if rating < 1400:
-        allowed_difficulties = [1, 2]
-    else:
-        allowed_difficulties = [1, 2, 3]
-
-    # Pick random endgame type
-    endgame_type = random.choice(list(ENDGAME_TEMPLATES.keys()))
-
-    # Filter templates by difficulty
-    filtered = [t for t in ENDGAME_TEMPLATES[endgame_type]
-                if t["difficulty"] in allowed_difficulties]
-
-    # Pick random from filtered templates
-    template = random.choice(filtered)
-    fen_template = template["fen"]
-    board = Board(fen_template)
-
-    player_color = random.choice([WHITE, BLACK])
-
-    # If player is black, switch the turn
-    if player_color == BLACK:
-        parts = board.fen().split()
-        parts[1] = 'b'
-        board = Board(' '.join(parts))
-
-    return {
-        "fen": board.fen(),
-        "type": endgame_type.replace("_", " "),
-        "playerColor": "white" if player_color == WHITE else "black"
-    }
 
 def get_game_over_reason(board: Board) -> str:
     if board.is_checkmate():
@@ -167,43 +105,6 @@ def read_game():
     with open('main.html') as f:
         return HTMLResponse(f.read())
 
-@app.get("/api/random-endgame")
-def random_endgame(rating: int = 1200, type: str = None):
-    if type and type in ENDGAME_TEMPLATES:
-        # Load specific endgame type
-        endgame_type = type
-    else:
-        # Random type
-        endgame_type = random.choice(list(ENDGAME_TEMPLATES.keys()))
-
-    # Determine allowed difficulties by rating
-    if rating < 1400:
-        allowed_difficulties = [1, 2]
-    else:
-        allowed_difficulties = [1, 2, 3]
-
-    # Filter templates by difficulty
-    filtered = [t for t in ENDGAME_TEMPLATES[endgame_type]
-                if t["difficulty"] in allowed_difficulties]
-
-    # Pick random from filtered templates
-    template = random.choice(filtered)
-    fen_template = template["fen"]
-    board = Board(fen_template)
-
-    player_color = random.choice([WHITE, BLACK])
-
-    # If player is black, switch the turn
-    if player_color == BLACK:
-        parts = board.fen().split()
-        parts[1] = 'b'
-        board = Board(' '.join(parts))
-
-    return {
-        "fen": board.fen(),
-        "type": endgame_type.replace("_", " "),
-        "playerColor": "white" if player_color == WHITE else "black"
-    }
 
 @app.post("/api/validate-move")
 def validate_move(request: MoveRequest):
@@ -260,9 +161,6 @@ def generate_advanced_endgame(rating: int = 1200):
     Generates an advanced random endgame position based on rating.
     Creates more complex and varied positions than templates.
     """
-    difficulty_level = min(3, max(1, (rating - 1000) // 200))  # 1, 2, or 3
-    
-    # Generate random position based on difficulty
     endgame_types = [
         'king_pawn_endgame',
         'rook_endgame', 
@@ -396,12 +294,3 @@ def lichess_endgame(rating: int = 1200):
             print(f"Error in fallback: {fallback_error}")
             raise HTTPException(status_code=500, detail="Could not generate endgame")
 
-@app.get("/api/endgame-types")
-def get_endgame_types():
-    """
-    Return available endgame types for selection.
-    """
-    return {
-        "templates": list(ENDGAME_TEMPLATES.keys()),
-        "sources": ["local", "lichess"]
-    }
